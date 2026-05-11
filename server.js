@@ -3,14 +3,19 @@ import cors from 'cors';
 import Database from 'better-sqlite3';
 import bcrypt from 'bcrypt';
 import { Rcon } from 'rcon-client';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Инициализация базы данных
 const db = new Database('hotland.db');
 
-// Инициализация таблиц
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +50,6 @@ db.exec(`
   );
 `);
 
-// Вспомогательная функция для ответов
 const handleReq = (handler) => async (req, res) => {
   try {
     const result = await handler(req.body);
@@ -54,6 +58,8 @@ const handleReq = (handler) => async (req, res) => {
     res.status(400).json({ error: err.message || err });
   }
 };
+
+// --- API Роуты ---
 
 app.post('/api/register', handleReq(async ({ username, email, password }) => {
   const exists = db.prepare('SELECT 1 FROM users WHERE username = ? OR email = ?').get(username, email);
@@ -133,7 +139,18 @@ app.post('/api/make_purchase', handleReq(({ username, item, duration, price }) =
   return 'Покупка успешно добавлена';
 }));
 
-const PORT = 3001;
+// --- РАЗДАЧА ФРОНТЕНДА (ОБЯЗАТЕЛЬНО ДЛЯ RENDER) ---
+
+// Указываем папку 'dist' для статических файлов
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Для любых других запросов (React Router) отдаем index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+// ПОРТ должен быть динамическим
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
